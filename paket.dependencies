@@ -1,0 +1,10 @@
+source https://nuget.org/api/v2
+
+framework: net46
+redirects: on
+
+nuget FAKE 
+nuget WindowsAzure.Storage
+nuget FSharp.Configuration
+nuget NLog.FSharp
+nuget NLog.Config
