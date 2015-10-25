@@ -55,6 +55,7 @@ let getTargetConnectionStrings prefix =
            if x.Name.StartsWith(prefix) then Some(x.ConnectionString)
            else None)
     |> Array.map (fun x -> SqlConnectionStringBuilder(x))
+    |> List.ofArray
 
 [<EntryPoint>]
 let main _ =
@@ -78,17 +79,20 @@ let main _ =
 
         let mastersOfEachServer =
             targets
-            |> Array.groupBy (fun x -> x.DataSource)
-            |> Array.map (fun (_, cs) -> cs.[0])
-            |> Array.map (fun c ->
-                   let ncs = SqlConnectionStringBuilder(c.ConnectionString)
-                   ncs.InitialCatalog <- "master"
-                   ncs)
+            |> List.groupBy (fun x -> x.DataSource)
+            |> List.where (fun (_, x) -> x.Length > 0)
+            |> List.choose (fun (_, cs) ->
+                    match cs with
+                    | c::_ -> 
+                       let ncs = SqlConnectionStringBuilder(c.ConnectionString)
+                       ncs.InitialCatalog <- "master"
+                       Some(ncs)
+                    | [] -> None)
 
         let storageAccount = CloudStorageAccount.Parse(azureConStr)
 
         mastersOfEachServer
-        |> Array.map (fun x ->
+        |> List.map (fun x ->
                logger.Info "Creating credentials on server %s if needed." x.DataSource
                possiblyCreateCredentials x.ConnectionString credName (storageAccount.Credentials.ExportBase64EncodedKey()) storageAccount.Credentials.AccountName)
         |> Async.Parallel
@@ -96,7 +100,7 @@ let main _ =
         |> ignore
 
         targets
-        |> Array.map (fun x ->
+        |> List.map (fun x ->
                logger.Info "Backing up %s." x.InitialCatalog
                backupDatabase containerName x credName)
         |> Async.Parallel
